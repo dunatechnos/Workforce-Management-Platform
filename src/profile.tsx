@@ -364,7 +364,7 @@ function EditProfile({
           .upload(path, file, { contentType: file.type });
         if (uploadError)
           throw new Error(
-            `Photo upload failed. ${uploadError.message} If this is a new database, run migration 0004.`,
+            `Photo upload failed. ${uploadError.message} Ask your administrator to check the avatars storage bucket in Supabase.`,
           );
         avatar = db.storage.from("avatars").getPublicUrl(path).data.publicUrl;
       }

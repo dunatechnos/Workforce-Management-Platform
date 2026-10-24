@@ -57,7 +57,7 @@ Full step-by-step guide: **[DEPLOY.md](DEPLOY.md)** — fork/template the repo, 
 
 Short version:
 
-1. Create a Supabase project → SQL Editor → run `supabase/schema.sql` once → set `bootstrap_email` + `allowed_domains`.
+1. Create a Supabase project → connect your repo copy under **Project Settings → Integrations → GitHub Integration** (working directory `.`, enable **Deploy to production**) → the database builds itself from `supabase/migrations/20261024000000_init.sql`, no SQL to paste.
 2. Fork this repo (or `Use this template`, private is fine) → Netlify `Add new site → Import an existing project` → build `npm run build`, publish `dist`.
 3. Netlify `Site settings → Environment variables`: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
 4. Supabase `Authentication → URL Configuration`: add the Netlify site URL.
@@ -73,19 +73,9 @@ npm install
 npm run dev            # http://localhost:5173
 ```
 
-### Existing database
-
-If the Supabase project was created before this version, run these migrations in the SQL Editor **in order**:
-
-1. `supabase/migrations/0003_flexible_regularization_branding.sql`
-2. `supabase/migrations/0004_profile_settings_weekoff_policy.sql`
-3. `supabase/migrations/0005_weekoff_workflow_workweek.sql`
-
-Do not rerun `supabase/schema.sql` or `npm run db:apply` on an existing database. Fresh installations only need `supabase/schema.sql`.
-
 ### Profile photos
 
-`schema.sql` and migration `0004` create a public Storage bucket `avatars` (2 MB, owner-only write). If your project blocks bucket creation via SQL Editor, create it manually: name `avatars`, public **on**, MIME types `image/png, image/jpeg, image/webp`.
+The initial migration creates a public Storage bucket `avatars` (2 MB, owner-only write). If your project blocks bucket creation, create it manually: name `avatars`, public **on**, MIME types `image/png, image/jpeg, image/webp`.
 
 ## First-run checklist
 
@@ -126,7 +116,7 @@ npm run shots   # regenerate docs/images screenshots with mock data
 | Login redirects back or the session fails             | Check the Supabase URL configuration includes your site URL                    |
 | "Connect your workspace" screen                       | `.env` is missing or incorrect; copy `.env.example` and restart the dev server |
 | "Last active manager cannot be removed"               | Keep at least one active manager                                               |
-| `weekoffs.status does not exist`                      | Run migration `0005` (older app builds also work without it)                   |
+| `weekoffs.status does not exist`                      | The initial migration has not been applied — check the GitHub integration deployment status in Supabase |
 
 ## Stack
 
