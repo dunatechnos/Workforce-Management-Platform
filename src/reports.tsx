@@ -1,23 +1,329 @@
-import { useState } from 'react'
-import { Download } from 'lucide-react'
-import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { useApp } from './context'
-import { allRows, calendars, csv, duration, monthRange, summary, today, useData, type Row } from './lib'
-import { ProfileSelect } from './employee'
-import { Empty, ErrorBox, Loading, Panel, Stat, Table } from './ui'
+import { useState } from "react";
+import { Download } from "lucide-react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { useApp } from "./context";
+import {
+  allRows,
+  calendars,
+  csv,
+  duration,
+  monthRange,
+  summary,
+  today,
+  useData,
+  type Row,
+} from "./lib";
+import { ProfileSelect } from "./employee";
+import { Empty, ErrorBox, Loading, Panel, Stat, Table } from "./ui";
 
-export function Analytics(){
- const {people,profile,version,act}=useApp(),[pid,setPid]=useState(profile.role==='manager'?'all':profile.id),[mode,setMode]=useState('monthly'),[month,setMonth]=useState(today().slice(0,7)),[year,setYear]=useState(Number(today().slice(0,4)))
- const [from,to]=mode==='monthly'?monthRange(month):[`${year}-01-01`,`${year}-12-31`]
- const selected=people.filter(p=>pid==='all'||p.id===pid)
- const q=useData(()=>calendars(selected,from,to),[pid,mode,month,year,version,people.map(p=>p.id).join(',')])
- if(q.error)return <ErrorBox error={q.error} retry={q.reload}/>
- const rows=q.data??[],s=summary(rows)
- const staff=selected.map<Row>(p=>({...p,...summary(rows.filter(r=>r.profile_id===p.id))}))
- const groups=[...new Set(rows.map(r=>mode==='yearly'?r.day.slice(0,7):r.day))]
- const bars=groups.map(g=>{const a=summary(rows.filter(r=>r.day.startsWith(g)));return {period:mode==='yearly'?new Date(g+'-01T00:00:00').toLocaleDateString('en',{month:'short'}):g.slice(8),Present:a.present,Leave:a.leave,Absent:a.absent}})
- const pie=[{name:'Present',value:s.present,color:'#4f896f'},{name:'Leave',value:s.leave,color:'#9896c8'},{name:'Absent',value:s.absent,color:'#d28c79'}]
- const exportSummary=()=>act(async()=>csv(`attendance-summary-${from}-${to}`,staff.map(p=>({employee_code:p.employee_code,name:p.name,email:p.email,department:p.department,from,to,present_days:p.present,leave_days:p.leave,absent_days:p.absent,late_checkins:p.late,unresolved:p.unresolved,net_minutes:p.minutes,attendance_percent:p.rate}))),'Summary downloaded')
- const exportLeave=()=>act(async()=>{const leaves=await allRows('leaves',q=>{q=q.gte('start_date',from).lte('start_date',to);if(pid!=='all')q=q.eq('profile_id',pid);return q});const types=await allRows('leave_types');csv(`leave-report-${from}-${to}`,leaves.map(l=>({employee:people.find(p=>p.id===l.profile_id)?.name,email:people.find(p=>p.id===l.profile_id)?.email,type:types.find(t=>t.id===l.type_id)?.tag,paid:types.find(t=>t.id===l.type_id)?.paid,from:l.start_date,to:l.end_date,days:l.days,status:l.status,reason:l.reason,manager_note:l.review_note})))},'Leave report downloaded')
- return <><div className="toolbar"><div className="row"><div className="segmented"><button className={mode==='monthly'?'selected':''} onClick={()=>setMode('monthly')}>Monthly</button><button className={mode==='yearly'?'selected':''} onClick={()=>setMode('yearly')}>Yearly</button></div>{mode==='monthly'?<input aria-label="Report month" type="month" value={month} onChange={e=>e.target.value&&setMonth(e.target.value)}/>:<input aria-label="Report year" type="number" min="2000" max="2200" value={year} onChange={e=>{const n=Number(e.target.value);if(n>=2000&&n<=2200)setYear(n)}}/>}<ProfileSelect value={pid} onChange={setPid} all/></div><button className="secondary" disabled={q.loading||!rows.length} onClick={exportSummary}><Download size={16}/> Summary CSV</button></div>{q.loading?<Loading/>:<><div className="stats-grid"><Stat label="Present day credits" value={s.present} sub="Includes 0.5 for half days"/><Stat label="Leave days" value={s.leave} sub="Approved leave to date"/><Stat label="Absent day credits" value={s.absent} sub="Includes unworked half days"/><Stat label="Net working time" value={duration(s.minutes)} sub={`${s.unresolved} shifts awaiting correction`}/></div><div className="reports-charts"><Panel title="Attendance over time" sub={mode==='yearly'?'Month-by-month breakdown':'Daily breakdown for the selected month'}><div className="chart tall"><ResponsiveContainer width="100%" height="100%"><BarChart data={bars}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e9ece6"/><XAxis dataKey="period" axisLine={false} tickLine={false}/><YAxis axisLine={false} tickLine={false} width={32}/><Tooltip/><Legend/><Bar dataKey="Present" stackId="a" fill="#4f896f"/><Bar dataKey="Leave" stackId="a" fill="#9896c8"/><Bar dataKey="Absent" stackId="a" fill="#d28c79" radius={[3,3,0,0]}/></BarChart></ResponsiveContainer></div></Panel><Panel title="The bigger picture" sub="Completed working-day credits">{s.present+s.leave+s.absent?<><div className="chart tall"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={pie} dataKey="value" nameKey="name" innerRadius="62%" outerRadius="85%" paddingAngle={4}>{pie.map(p=><Cell fill={p.color} key={p.name}/>)}</Pie><Tooltip/><Legend/></PieChart></ResponsiveContainer></div><p className="center muted">{s.rate}% attendance rate</p></>:<Empty text="No completed days" sub="Your attendance breakdown will appear here."/>}</Panel></div><Panel title="Employee breakdown" sub="Future dates, holidays, week-offs and in-progress days are excluded from day credits." actions={<div className="row"><button className="secondary" disabled={!rows.length} onClick={()=>act(async()=>csv(`daily-register-${from}-${to}`,rows),'Daily register downloaded')}><Download size={15}/> Daily register</button><button className="secondary" onClick={exportLeave}><Download size={15}/> Leave report</button></div>}><Table rows={staff} columns={[{title:'Employee',render:r=><><strong>{r.name}</strong><small className="block muted">{r.employee_code||r.department}</small></>},{title:'Present',render:r=>r.present},{title:'Leave',render:r=>r.leave},{title:'Absent',render:r=>r.absent},{title:'Late',render:r=>r.late},{title:'Unresolved',render:r=>r.unresolved},{title:'Net time',render:r=>duration(r.minutes)},{title:'Attendance',render:r=><span className="rate-cell"><i style={{width:Math.max(2,r.rate)+'%'}}/><strong>{r.rate}%</strong></span>}]}/></Panel><p className="hint">Attendance rate = present credits ÷ (present + leave + absent credits). Missing checkouts are shown separately until corrected. A half-day leave receives 0.5 present credit only after completing the snapshotted minimum half-day work hours. Exports are UTF-8 CSV, compatible with Excel and Google Sheets.</p></>}</>
+export function Analytics() {
+  const { people, profile, version, act } = useApp(),
+    [pid, setPid] = useState(profile.role === "manager" ? "all" : profile.id),
+    [mode, setMode] = useState("monthly"),
+    [month, setMonth] = useState(today().slice(0, 7)),
+    [year, setYear] = useState(Number(today().slice(0, 4)));
+  const [from, to] =
+    mode === "monthly" ? monthRange(month) : [`${year}-01-01`, `${year}-12-31`];
+  const selected = people.filter((p) => pid === "all" || p.id === pid);
+  const q = useData(
+    () => calendars(selected, from, to),
+    [pid, mode, month, year, version, people.map((p) => p.id).join(",")],
+    `reports:${pid}:${from}:${to}`,
+  );
+  if (q.error) return <ErrorBox error={q.error} retry={q.reload} />;
+  const rows = q.data ?? [],
+    s = summary(rows);
+  const staff = selected.map<Row>((p) => ({
+    ...p,
+    ...summary(rows.filter((r) => r.profile_id === p.id)),
+  }));
+  const groups = [
+    ...new Set(
+      rows.map((r) => (mode === "yearly" ? r.day.slice(0, 7) : r.day)),
+    ),
+  ];
+  const bars = groups.map((g) => {
+    const a = summary(rows.filter((r) => r.day.startsWith(g)));
+    return {
+      period:
+        mode === "yearly"
+          ? new Date(g + "-01T00:00:00").toLocaleDateString("en", {
+              month: "short",
+            })
+          : g.slice(8),
+      Present: a.present,
+      Leave: a.leave,
+      Absent: a.absent,
+    };
+  });
+  const pie = [
+    { name: "Present", value: s.present, color: "#4f896f" },
+    { name: "Leave", value: s.leave, color: "#9896c8" },
+    { name: "Absent", value: s.absent, color: "#d28c79" },
+  ];
+  const exportSummary = () =>
+    act(
+      async () =>
+        csv(
+          `attendance-summary-${from}-${to}`,
+          staff.map((p) => ({
+            employee_code: p.employee_code,
+            name: p.name,
+            email: p.email,
+            department: p.department,
+            from,
+            to,
+            present_days: p.present,
+            leave_days: p.leave,
+            absent_days: p.absent,
+            late_checkins: p.late,
+            unresolved: p.unresolved,
+            net_minutes: p.minutes,
+            attendance_percent: p.rate,
+          })),
+        ),
+      "Summary downloaded",
+    );
+  const exportLeave = () =>
+    act(async () => {
+      const leaves = await allRows("leaves", (q) => {
+        q = q.gte("start_date", from).lte("start_date", to);
+        if (pid !== "all") q = q.eq("profile_id", pid);
+        return q;
+      });
+      const types = await allRows("leave_types");
+      csv(
+        `leave-report-${from}-${to}`,
+        leaves.map((l) => ({
+          employee: people.find((p) => p.id === l.profile_id)?.name,
+          email: people.find((p) => p.id === l.profile_id)?.email,
+          type: types.find((t) => t.id === l.type_id)?.tag,
+          paid: types.find((t) => t.id === l.type_id)?.paid,
+          from: l.start_date,
+          to: l.end_date,
+          days: l.days,
+          status: l.status,
+          reason: l.reason,
+          manager_note: l.review_note,
+        })),
+      );
+    }, "Leave report downloaded");
+  return (
+    <>
+      <div className="toolbar">
+        <div className="row">
+          <div className="segmented">
+            <button
+              className={mode === "monthly" ? "selected" : ""}
+              onClick={() => setMode("monthly")}
+            >
+              Monthly
+            </button>
+            <button
+              className={mode === "yearly" ? "selected" : ""}
+              onClick={() => setMode("yearly")}
+            >
+              Yearly
+            </button>
+          </div>
+          {mode === "monthly" ? (
+            <input
+              aria-label="Report month"
+              type="month"
+              value={month}
+              onChange={(e) => e.target.value && setMonth(e.target.value)}
+            />
+          ) : (
+            <input
+              aria-label="Report year"
+              type="number"
+              min="2000"
+              max="2200"
+              value={year}
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                if (n >= 2000 && n <= 2200) setYear(n);
+              }}
+            />
+          )}
+          <ProfileSelect value={pid} onChange={setPid} all />
+        </div>
+        <button
+          className="secondary"
+          disabled={q.loading || !rows.length}
+          onClick={exportSummary}
+        >
+          <Download size={16} /> Summary CSV
+        </button>
+      </div>
+      {q.loading ? (
+        <Loading />
+      ) : (
+        <>
+          <div className="stats-grid">
+            <Stat
+              label="Present day credits"
+              value={s.present}
+              sub="Includes 0.5 for half days"
+            />
+            <Stat
+              label="Leave days"
+              value={s.leave}
+              sub="Approved leave to date"
+            />
+            <Stat
+              label="Absent day credits"
+              value={s.absent}
+              sub="Includes unworked half days"
+            />
+            <Stat
+              label="Net working time"
+              value={duration(s.minutes)}
+              sub={`${s.unresolved} shifts awaiting correction`}
+            />
+          </div>
+          <div className="reports-charts">
+            <Panel
+              title="Attendance over time"
+              sub={
+                mode === "yearly"
+                  ? "Month-by-month breakdown"
+                  : "Daily breakdown for the selected month"
+              }
+            >
+              <div className="chart tall">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={bars}>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      vertical={false}
+                      stroke="#e9ece6"
+                    />
+                    <XAxis dataKey="period" axisLine={false} tickLine={false} />
+                    <YAxis axisLine={false} tickLine={false} width={32} />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="Present" stackId="a" fill="#4f896f" />
+                    <Bar dataKey="Leave" stackId="a" fill="#9896c8" />
+                    <Bar
+                      dataKey="Absent"
+                      stackId="a"
+                      fill="#d28c79"
+                      radius={[3, 3, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </Panel>
+            <Panel title="Attendance mix" sub="Completed working-day credits">
+              {s.present + s.leave + s.absent ? (
+                <>
+                  <div className="chart tall">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={pie}
+                          dataKey="value"
+                          nameKey="name"
+                          innerRadius="62%"
+                          outerRadius="85%"
+                          paddingAngle={4}
+                        >
+                          {pie.map((p) => (
+                            <Cell fill={p.color} key={p.name} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <p className="center muted">{s.rate}% attendance rate</p>
+                </>
+              ) : (
+                <Empty
+                  text="No completed days"
+                  sub="Your attendance breakdown will appear here."
+                />
+              )}
+            </Panel>
+          </div>
+          <Panel
+            title="Employee breakdown"
+            sub="Future dates, holidays, week-offs and in-progress days are excluded from day credits."
+            actions={
+              <div className="row">
+                <button
+                  className="secondary"
+                  disabled={!rows.length}
+                  onClick={() =>
+                    act(
+                      async () => csv(`daily-register-${from}-${to}`, rows),
+                      "Daily register downloaded",
+                    )
+                  }
+                >
+                  <Download size={15} /> Daily register
+                </button>
+                <button className="secondary" onClick={exportLeave}>
+                  <Download size={15} /> Leave report
+                </button>
+              </div>
+            }
+          >
+            <Table
+              rows={staff}
+              columns={[
+                {
+                  title: "Employee",
+                  render: (r) => (
+                    <>
+                      <strong>{r.name}</strong>
+                      <small className="block muted">
+                        {r.employee_code || r.department}
+                      </small>
+                    </>
+                  ),
+                },
+                { title: "Present", render: (r) => r.present },
+                { title: "Leave", render: (r) => r.leave },
+                { title: "Absent", render: (r) => r.absent },
+                { title: "Late", render: (r) => r.late },
+                { title: "Unresolved", render: (r) => r.unresolved },
+                { title: "Net time", render: (r) => duration(r.minutes) },
+                {
+                  title: "Attendance",
+                  render: (r) => (
+                    <span className="rate-cell">
+                      <i style={{ width: Math.max(2, r.rate) + "%" }} />
+                      <strong>{r.rate}%</strong>
+                    </span>
+                  ),
+                },
+              ]}
+            />
+          </Panel>
+          <p className="hint">
+            Attendance rate = present credits ÷ (present + leave + absent
+            credits). Missing checkouts are shown separately until corrected. A
+            half-day leave receives 0.5 present credit only after completing the
+            snapshotted minimum half-day work hours. Exports are UTF-8 CSV,
+            compatible with Excel and Google Sheets.
+          </p>
+        </>
+      )}
+    </>
+  );
 }

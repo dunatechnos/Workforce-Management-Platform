@@ -12,7 +12,10 @@ try {
   console.log('SCHEMA APPLIED')
   if (BOOTSTRAP_EMAIL) {
     const domains = (ALLOWED_DOMAINS ?? '').split(',').map(d => d.trim().toLowerCase().replace(/^@/, '')).filter(Boolean)
-    await client.query(`update public.settings set bootstrap_email=$1, allowed_domains=$2, company_name=$3`, [BOOTSTRAP_EMAIL.toLowerCase(), domains, COMPANY_NAME || 'HV Attendance'])
+    await client.query(
+      `update public.settings set bootstrap_email=$1, allowed_domains=$2, company_name=$3`,
+      [BOOTSTRAP_EMAIL.toLowerCase(), domains, COMPANY_NAME || ''],
+    )
     console.log('SETTINGS SEEDED')
   }
   const settings = (await client.query('select company_name, bootstrap_email, allowed_domains from public.settings')).rows[0]

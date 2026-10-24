@@ -1,104 +1,133 @@
-# HV Attendance
+# Workforce
 
-Zoho-style attendance system. Frontend: React + Vite. Backend: Supabase PostgreSQL (Auth + RLS + RPC business logic). Times in IST (Asia/Kolkata).
+Self-hosted attendance, leave, and week-off management for small and mid-size teams. React + Vite frontend, Supabase (PostgreSQL, Auth, RLS, RPC) backend. One deployment serves one organization, fully rebrandable from the setup wizard.
 
-## What is built
+## Screenshots
 
-- Google login, roles: **Manager** and **Employee** (first bootstrap manager set in DB; domain restriction enforced in DB, not just UI)
-- Check-in / Check-out with multiple breaks (open shift = 1 per person; checkout auto-closes open break; 20-hour shift cap)
-- Calendar: present / half-day / absent / leave / half-leave / weekoff / holiday / missing-checkout / not-checked-in
-- Leave: custom types + tags, annual quotas, pending requests reserve balance, manager approve/reject, cancel rules
-- Week-off: fixed days per employee + flexible weekly quota (manager can exceed quota, employee cannot)
-- Regularization: employee requests correction with actual in/out + break minutes; manager approval replaces punches (old values stay in audit trail)
-- Manager: People (pre-add by email before first login), Approval inbox, Leave balances, Holidays, Organization settings, Audit trail
-- Analytics: monthly/yearly staff-wise charts + CSV exports (summary, daily register, leave report)
-- Long-term safety: RLS everywhere, validated RPCs only (no direct punch/balance writes), per-day rule snapshots, schedule history, immutable audit log
+### Manager command center
 
-## 1. Supabase setup (do once)
+Live team status, KPIs, approval queue, holidays, personal attendance, and policy snapshot.
 
-1. Create a **new** Supabase project.
-2. Open **SQL Editor**, paste the full `supabase/schema.sql`, run it **once**. Re-running on the same project will error — that is intentional. Future changes must be small versioned migrations, never a reset.
-3. Before anyone logs in, set the bootstrap manager (run in SQL Editor, replace values):
-   ```sql
-   update public.settings
-   set bootstrap_email = 'manager@yourcompany.com',
-       allowed_domains = array['yourcompany.com'],
-       company_name = 'Your Company';
-   ```
-   - `bootstrap_email`: the Google email that must sign in first (becomes Manager).
-   - `allowed_domains`: e.g. `array['yourcompany.com']`. Empty array = any Google domain allowed after bootstrap.
-4. **Login works out of the box with Supabase built-in email + password auth** (enabled by default — no external service needed). Optional: **Authentication → Providers → Google → Enable** if you later want a "Continue with Google" button too — it appears automatically once enabled. You need a Google OAuth Client ID/Secret (Google Cloud Console → APIs & Services → Credentials → OAuth client, type Web). Add Supabase's callback URL (shown on that Supabase Auth page) as an authorized redirect URI in Google.
-5. **Authentication → URL Configuration:** add your URLs:
-   - Local: `http://localhost:5173`
-   - Netlify: `https://YOUR-SITE.netlify.app`
-6. Never expose the `service_role` key. Frontend uses only the publishable/anon key.
+![Manager dashboard](docs/images/admin-dashboard.png)
 
-## First login (no Google Cloud needed)
+### Employee workspace
 
-1. Open the app → **Create account** tab → sign up with the `bootstrap_email` address and any password (min 6 characters).
-2. If Supabase email confirmation is on (default), click the link in your inbox, then **Sign in**. Company-domain and bootstrap rules are enforced by the database itself.
-3. You become Manager. Then add employees in **People** before they create their accounts.
+Time-aware greeting, live shift card, monthly stats, personal request status, weekly hours, and holidays — employee access only, no admin controls.
 
-## 2. Frontend .env
+![Employee dashboard](docs/images/employee-dashboard.png)
+
+### Attendance calendar
+
+Present, half day, absent, leave, week-off, holiday, and missing-checkout states with correction requests.
+
+![Attendance calendar](docs/images/attendance.png)
+
+### Approval inbox
+
+Leave, week-off, and regularization requests with approve/reject and review notes.
+
+![Approval inbox](docs/images/approvals.png)
+
+### Organization settings
+
+Branding, time zone, attendance policy, workweek pattern, week-off workflow, leave types, and email domains.
+
+![Organization settings](docs/images/settings.png)
+
+> Screenshots are captured from demo data with `npm run shots`. See [DEPLOY.md](DEPLOY.md) to go live in ~15 minutes without installing anything locally.
+
+## Features
+
+- Email/password sign-in, optional Google sign-in, Manager and Employee roles
+- Check-in, check-out, and multiple breaks with instant optimistic feedback
+- Attendance calendar: present, half day, absent, leave, half leave, week off, holiday, missing checkout, not checked in
+- Flexible regularization: check-in only, check-out only, break correction, or full-day correction; multiple partial requests allowed on the same day
+- Leave management: custom types and tags, annual quotas, pending requests reserve balance, manager approval, cancellation rules
+- Week-offs with three policies: employee self-service, employee request with manager approval, or admin-only scheduling
+- Configurable workweek: 5 working days (2 offs/week), 5.5 days (alternating 6-day and 5-day weeks), or 6 days (1 off/week). Fixed weekdays count toward the weekly allowance; flexible week-offs fill the remainder
+- Employee profile workspace: photo, birthday, job title, department, contact details, personal appearance preferences, and all requests in one place
+- Manager command center, approval inbox, people directory, leave balances, holidays, organization settings, immutable audit trail
+- Monthly/yearly analytics with CSV exports
+- Configurable time zone (default `Asia/Kolkata`), fully editable product branding, professional dark theme
+- First-run setup wizard: organization name, product name, sign-in copy, logo, support email, time zone, allowed domains
+
+## Deploy in ~15 minutes (no local install)
+
+Full step-by-step guide: **[DEPLOY.md](DEPLOY.md)** — fork/template the repo, create the Supabase backend, connect Netlify, set two environment variables, sign in.
+
+Short version:
+
+1. Create a Supabase project → SQL Editor → run `supabase/schema.sql` once → set `bootstrap_email` + `allowed_domains`.
+2. Fork this repo (or `Use this template`, private is fine) → Netlify `Add new site → Import an existing project` → build `npm run build`, publish `dist`.
+3. Netlify `Site settings → Environment variables`: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
+4. Supabase `Authentication → URL Configuration`: add the Netlify site URL.
+5. Open the site → sign in as the bootstrap manager → complete the setup wizard.
+
+Never commit `.env` — secrets live in Netlify environment variables, so the repo can stay private or public.
+
+## Local development
 
 ```bash
-cp .env.example .env
-```
-
-Fill:
-
-```ini
-VITE_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
-VITE_SUPABASE_ANON_KEY=YOUR_SUPABASE_PUBLISHABLE_OR_ANON_KEY
-```
-
-## 3. Run locally
-
-```bash
+cp .env.example .env   # fill VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY
 npm install
-npm run dev
+npm run dev            # http://localhost:5173
 ```
 
-Open `http://localhost:5173`, sign in with the bootstrap manager Google account first.
+### Existing database
 
-## 4. Manager first-run checklist
+If the Supabase project was created before this version, run these migrations in the SQL Editor **in order**:
 
-1. Sign in as bootstrap manager → Organization settings → verify policy (default: 480 min full day, 240 min half day, 60 min break, 12:00 half-day cutoff).
-2. People → Add employee (company Google email, joining date, weekly quota, fixed offs) **before** they log in.
-3. Add Holidays for the year.
-4. Leave types are seeded (CL/SL/LOP) — edit/add tags as needed; archive, don't delete, old types.
-5. Leave balances: per-employee yearly entitlement override (incl. carry-forward/adjustment), else type default applies.
+1. `supabase/migrations/0003_flexible_regularization_branding.sql`
+2. `supabase/migrations/0004_profile_settings_weekoff_policy.sql`
+3. `supabase/migrations/0005_weekoff_workflow_workweek.sql`
 
-## 5. Netlify deploy (frontend only)
+Do not rerun `supabase/schema.sql` or `npm run db:apply` on an existing database. Fresh installations only need `supabase/schema.sql`.
 
-- **Build command:** `npm run build`
-- **Publish directory:** `dist`
-- **Environment variables:** `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
-- `netlify.toml` already has the SPA redirect (`/* → /index.html`) and secure headers. No backend to host — Supabase is the backend.
+### Profile photos
 
-## 6. Attendance rules (defaults, manager-editable)
+`schema.sql` and migration `0004` create a public Storage bucket `avatars` (2 MB, owner-only write). If your project blocks bucket creation via SQL Editor, create it manually: name `avatars`, public **on**, MIME types `image/png, image/jpeg, image/webp`.
 
-- Full day: 8h (480 min) net work + up to 1h break. Check-in after 12:00 PM caps the day at half-day.
-- Half day: 4h+ net work after late check-in, or 4–8h normally. Below 4h = absent.
-- Excess break flagged beyond allowed break. Missing checkout flagged after 20h open shift.
-- Rule changes snapshot at first check-in — history is never rewritten.
-- No cron needed: absences derive at query time (past working day, no punch, no leave/weekoff/holiday = absent).
+## First-run checklist
 
-## 7. Verify
+1. Complete the setup wizard (org name, product name, copy, logo, time zone, domains).
+2. Settings → attendance policy (defaults: 480 min full day, 240 min half day, 60 min break, 12:00 half-day cutoff).
+3. Settings → week-off policy + workweek pattern (self-service / approval-required / admin-only).
+4. People → add employees before they sign up; set fixed weekdays per employee.
+5. Add holidays; review seeded leave types (CL, SL, LOP); set entitlements.
+
+## Attendance rules
+
+- Full day: 8 h net work + up to 1 h break; check-in after cutoff caps the day at half day.
+- Half day: 4+ h net after a late check-in, or 4–8 h on a normal day; below 4 h is absent.
+- Excess break flagged; open shift flagged as missing checkout after 20 h.
+- Rule values are snapshotted per record — policy changes never rewrite history.
+- Absences are derived at query time; no cron job needed.
+
+## Regularization
+
+Separate requests for check-in only, check-out only, break correction (optional full break replacement), or full-day correction. Managers approve/reject with a note; approvals recalculate the day, originals stay in the audit trail.
+
+## Verify
 
 ```bash
-npm test        # Postgres logic tests (PGlite): auth, RLS, punches, quota, leave, corrections, audit
-npm run build   # production build → dist/
-npm run smoke   # boots dist/ in preview, checks login page in real Chromium, zero JS errors
+npm test        # PostgreSQL logic tests with PGlite
+npm run build   # type-check and production build
+npm run smoke   # preview build, login page check in Chromium, no JS errors
+npm run shots   # regenerate docs/images screenshots with mock data
 ```
 
 ## Troubleshooting
 
-| Problem | Fix |
-|---|---|
-| "The configured bootstrap manager must sign in first" | Sign in with `bootstrap_email` first, or update it in `settings` |
-| "Your company email domain is not allowed" | Add the domain to `settings.allowed_domains` |
-| "Email not confirmed yet" | Click the confirmation link in your inbox, then sign in (or turn off Confirm Email in Supabase Auth settings) |
-| Login redirects back / session error | Check Supabase URL config includes your site URL |
-| Blank app with "Connect your workspace" | `.env` missing/wrong — copy `.env.example`, restart dev server |
-| "Last active manager cannot be removed" | Promote/deactivate correctly — at least one active manager must remain |
+| Problem                                               | Fix                                                                            |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------ |
+| "The configured bootstrap manager must sign in first" | Sign in with `bootstrap_email`, or update it in `public.settings`              |
+| "Your email domain is not allowed"                    | Add the domain to `public.settings.allowed_domains`                            |
+| "Email not confirmed yet"                             | Open the confirmation link, or disable **Confirm email** in Supabase Auth      |
+| Login redirects back or the session fails             | Check the Supabase URL configuration includes your site URL                    |
+| "Connect your workspace" screen                       | `.env` is missing or incorrect; copy `.env.example` and restart the dev server |
+| "Last active manager cannot be removed"               | Keep at least one active manager                                               |
+| `weekoffs.status does not exist`                      | Run migration `0005` (older app builds also work without it)                   |
+
+## Stack
+
+React 19 · Vite 7 · Supabase (Postgres + Auth + RLS + RPC) · Tailwind 4 · Recharts · PGlite (tests) · Playwright (smoke + screenshots) · Netlify (static hosting).

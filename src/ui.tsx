@@ -1,19 +1,317 @@
-import { useEffect, useRef, type ReactNode } from 'react'
-import { AlertCircle, LoaderCircle, X, Inbox, ArrowUpRight } from 'lucide-react'
-import { labels, type Row } from './lib'
+import { useEffect, useRef, type ReactNode } from "react";
+import {
+  AlertCircle,
+  LoaderCircle,
+  X,
+  Inbox,
+  ArrowUpRight,
+} from "lucide-react";
+import { initials, labels, type Row } from "./lib";
+import { DatePicker, TimePicker } from "./pickers";
 
-export function Badge({value}:{value:string}){return <span className={`badge ${value}`}>{labels[value]??value.replaceAll('_',' ')}</span>}
-export function Empty({text='No records yet',sub='Your records will appear here.'}:{text?:string;sub?:string}){return <div className="empty"><Inbox size={32}/><strong>{text}</strong><p>{sub}</p></div>}
-export function Loading(){return <div className="loading"><LoaderCircle className="spin" size={22}/> Loading…</div>}
-export function ErrorBox({error,retry}:{error:string;retry?:()=>void}){return <div className="error-box" role="alert"><AlertCircle size={19}/><span>{error}</span>{retry&&<button onClick={retry}>Retry</button>}</div>}
-export function Panel({title,sub,actions,children,className=''}:{title?:string;sub?:string;actions?:ReactNode;children:ReactNode;className?:string}){return <section className={`panel ${className}`}>{title&&<div className="panel-head"><div><h2>{title}</h2>{sub&&<p>{sub}</p>}</div>{actions}</div>}{children}</section>}
-export function Stat({label,value,sub,tone=''}:{label:string;value:ReactNode;sub?:string;tone?:string}){return <div className={`stat ${tone}`}><div className="stat-label">{label}<ArrowUpRight size={17}/></div><strong>{value}</strong>{sub&&<p>{sub}</p>}</div>}
-export function Table({columns,rows,empty}:{columns:{title:string;render:(r:Row)=>ReactNode}[];rows:Row[];empty?:string}){if(!rows.length)return <Empty text={empty}/>;return <div className="table-wrap"><table><thead><tr>{columns.map((c,i)=><th key={i}>{c.title}</th>)}</tr></thead><tbody>{rows.map((r,i)=><tr key={r.id??r.day??i}>{columns.map((c,j)=><td key={j}>{c.render(r)}</td>)}</tr>)}</tbody></table></div>}
-export function Modal({title,onClose,children}:{title:string;onClose:()=>void;children:ReactNode}){
- const ref=useRef<HTMLDialogElement>(null)
- useEffect(()=>{const el=ref.current!;el.showModal();return()=>el.close()},[])
- return <dialog ref={ref} onCancel={e=>{e.preventDefault();onClose()}}><div className="modal-head"><h2>{title}</h2><button type="button" className="icon-btn" onClick={onClose} aria-label="Close dialog"><X size={20}/></button></div>{children}</dialog>
+export function UserAvatar({
+  person,
+  size = "",
+}: {
+  person: Row;
+  size?: "" | "small" | "large";
+}) {
+  return (
+    <span className={`avatar ${size} ${person.avatar_url ? "has-image" : ""}`}>
+      {person.avatar_url ? (
+        <img src={person.avatar_url} alt={`${person.name} profile photo`} />
+      ) : (
+        initials(person.name)
+      )}
+    </span>
+  );
 }
-export type Field = {name:string;label:string;type?:string;value?:any;required?:boolean;options?:{value:string;label:string}[];min?:number|string;max?:number|string;step?:number;help?:string}
-export function Fields({fields}:{fields:Field[]}){return <div className="form-grid">{fields.map(f=><label key={f.name} className={f.type==='textarea'?'wide':''}><span>{f.label}{f.required!==false&&f.type!=='checkbox'?' *':''}</span>{f.type==='select'?<select name={f.name} defaultValue={f.value??''} required={f.required!==false}>{f.options?.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}</select>:f.type==='textarea'?<textarea name={f.name} defaultValue={f.value??''} required={f.required!==false} minLength={f.required!==false?3:undefined} rows={3}/>:f.type==='checkbox'?<input type="checkbox" name={f.name} defaultChecked={Boolean(f.value)}/>:<input name={f.name} type={f.type??'text'} defaultValue={f.value??''} required={f.required!==false} min={f.min} max={f.max} step={f.step}/>} {f.help&&<small>{f.help}</small>}</label>)}</div>}
-export function FormModal({title,fields,busy,onClose,onSave,children}:{title:string;fields:Field[];busy:boolean;onClose:()=>void;onSave:(v:Row)=>void;children?:ReactNode}){return <Modal title={title} onClose={onClose}><form onSubmit={e=>{e.preventDefault();const fd=new FormData(e.currentTarget);const v:Row=Object.fromEntries(fd);fields.forEach(f=>{if(f.type==='checkbox')v[f.name]=fd.has(f.name);if(f.type==='number')v[f.name]=Number(v[f.name])});onSave(v)}}><Fields fields={fields}/>{children}<footer className="modal-footer"><button type="button" className="secondary" onClick={onClose}>Cancel</button><button disabled={busy} type="submit">{busy?'Saving…':'Save changes'}</button></footer></form></Modal>}
+
+export function Badge({ value }: { value: string }) {
+  return (
+    <span className={`badge ${value}`}>
+      {labels[value] ?? value.replaceAll("_", " ")}
+    </span>
+  );
+}
+export function Empty({
+  text = "No records yet",
+  sub = "Your records will appear here.",
+}: {
+  text?: string;
+  sub?: string;
+}) {
+  return (
+    <div className="empty">
+      <Inbox size={32} />
+      <strong>{text}</strong>
+      <p>{sub}</p>
+    </div>
+  );
+}
+export function Loading() {
+  return (
+    <div className="loading">
+      <LoaderCircle className="spin" size={22} /> Loading…
+    </div>
+  );
+}
+export function ErrorBox({
+  error,
+  retry,
+}: {
+  error: string;
+  retry?: () => void;
+}) {
+  return (
+    <div className="error-box" role="alert">
+      <AlertCircle size={19} />
+      <span>{error}</span>
+      {retry && <button onClick={retry}>Retry</button>}
+    </div>
+  );
+}
+export function Panel({
+  title,
+  sub,
+  actions,
+  children,
+  className = "",
+}: {
+  title?: string;
+  sub?: string;
+  actions?: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={`panel ${className}`}>
+      {title && (
+        <div className="panel-head">
+          <div>
+            <h2>{title}</h2>
+            {sub && <p>{sub}</p>}
+          </div>
+          {actions}
+        </div>
+      )}
+      {children}
+    </section>
+  );
+}
+export function Stat({
+  label,
+  value,
+  sub,
+  tone = "",
+}: {
+  label: string;
+  value: ReactNode;
+  sub?: string;
+  tone?: string;
+}) {
+  return (
+    <div className={`stat ${tone}`}>
+      <div className="stat-label">
+        {label}
+        <ArrowUpRight size={17} />
+      </div>
+      <strong>{value}</strong>
+      {sub && <p>{sub}</p>}
+    </div>
+  );
+}
+export function Table({
+  columns,
+  rows,
+  empty,
+}: {
+  columns: { title: string; render: (r: Row) => ReactNode }[];
+  rows: Row[];
+  empty?: string;
+}) {
+  if (!rows.length) return <Empty text={empty} />;
+  return (
+    <div className="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            {columns.map((c, i) => (
+              <th key={i}>{c.title}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={r.id ?? r.day ?? i}>
+              {columns.map((c, j) => (
+                <td key={j}>{c.render(r)}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+export function Modal({
+  title,
+  onClose,
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const el = ref.current!;
+    el.showModal();
+    return () => el.close();
+  }, []);
+  return (
+    <dialog
+      ref={ref}
+      onCancel={(e) => {
+        e.preventDefault();
+        onClose();
+      }}
+    >
+      <div className="modal-head">
+        <h2>{title}</h2>
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={onClose}
+          aria-label="Close dialog"
+        >
+          <X size={20} />
+        </button>
+      </div>
+      {children}
+    </dialog>
+  );
+}
+export type Field = {
+  name: string;
+  label: string;
+  type?: string;
+  value?: any;
+  required?: boolean;
+  options?: { value: string; label: string }[];
+  min?: number | string;
+  max?: number | string;
+  step?: number;
+  help?: string;
+  clearable?: boolean;
+};
+export function Fields({ fields }: { fields: Field[] }) {
+  return (
+    <div className="form-grid">
+      {fields.map((f) => (
+        <label key={f.name} className={f.type === "textarea" ? "wide" : ""}>
+          <span>
+            {f.label}
+            {f.required !== false && f.type !== "checkbox" ? " *" : ""}
+          </span>
+          {f.type === "select" ? (
+            <select
+              name={f.name}
+              defaultValue={f.value ?? ""}
+              required={f.required !== false}
+            >
+              {f.options?.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          ) : f.type === "textarea" ? (
+            <textarea
+              name={f.name}
+              defaultValue={f.value ?? ""}
+              required={f.required !== false}
+              minLength={f.required !== false ? 3 : undefined}
+              rows={3}
+            />
+          ) : f.type === "checkbox" ? (
+            <input
+              type="checkbox"
+              name={f.name}
+              defaultChecked={Boolean(f.value)}
+            />
+          ) : f.type === "date" ? (
+            <DatePicker
+              name={f.name}
+              value={f.value}
+              min={typeof f.min === "string" ? f.min : undefined}
+              max={typeof f.max === "string" ? f.max : undefined}
+              clearable={f.clearable}
+              onChange={() => {}}
+            />
+          ) : f.type === "time" ? (
+            <TimePicker
+              name={f.name}
+              value={f.value}
+              onChange={() => {}}
+            />
+          ) : (
+            <input
+              name={f.name}
+              type={f.type ?? "text"}
+              defaultValue={f.value ?? ""}
+              required={f.required !== false}
+              min={f.min}
+              max={f.max}
+              step={f.step}
+            />
+          )}{" "}
+          {f.help && <small>{f.help}</small>}
+        </label>
+      ))}
+    </div>
+  );
+}
+export function FormModal({
+  title,
+  fields,
+  busy,
+  onClose,
+  onSave,
+  children,
+}: {
+  title: string;
+  fields: Field[];
+  busy: boolean;
+  onClose: () => void;
+  onSave: (v: Row) => void;
+  children?: ReactNode;
+}) {
+  return (
+    <Modal title={title} onClose={onClose}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          const fd = new FormData(e.currentTarget);
+          const v: Row = Object.fromEntries(fd);
+          fields.forEach((f) => {
+            if (f.type === "checkbox") v[f.name] = fd.has(f.name);
+            if (f.type === "number") v[f.name] = Number(v[f.name]);
+          });
+          onSave(v);
+        }}
+      >
+        <Fields fields={fields} />
+        {children}
+        <footer className="modal-footer">
+          <button type="button" className="secondary" onClick={onClose}>
+            Cancel
+          </button>
+          <button disabled={busy} type="submit">
+            {busy ? "Saving…" : "Save changes"}
+          </button>
+        </footer>
+      </form>
+    </Modal>
+  );
+}
