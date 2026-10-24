@@ -1,6 +1,6 @@
 <div align="center">
 
-# Workforce
+# Workforce-Management-Platform
 
 **Self-hosted attendance, leave, and week-off management for small and mid-size teams.**
 
